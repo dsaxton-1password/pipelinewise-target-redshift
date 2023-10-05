@@ -254,6 +254,7 @@ class DbSync:
             aws_session = boto3.session.Session(profile_name=aws_profile)
 
         if role_arn:
+            self.logger.info(f"Assuming role {role_arn}")
             sts = aws_session.client('sts')
             response = sts.assume_role(RoleArn=role_arn, RoleSessionName=f'target-redshift-session|{role_arn}')
             aws_session = boto3.Session(
