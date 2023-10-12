@@ -345,7 +345,7 @@ def flush_streams(
 
 
 def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False, compression=None, slices=None, temp_dir=None):
-    # Load into redshift                                            
+    # Load into redshift
     try:
         if row_count[stream] > 0:
             flush_records(stream, records_to_load, row_count[stream], db_sync, compression, slices, temp_dir)
@@ -410,6 +410,7 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
             for record in chunk:
                 csv_line = db_sync.record_to_csv_line(record)
                 csv_f.write(bytes(csv_line + "\n", "UTF-8"))
+        LOGGER.info(f"chunk_number: {chunk_number}")
         s3_key = db_sync.put_to_s3(
             csv_file,
             stream,
