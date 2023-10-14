@@ -24,6 +24,7 @@ LOGGER = get_logger('target_redshift')
 DEFAULT_BATCH_SIZE_ROWS = 100000
 DEFAULT_PARALLELISM = 0  # 0 The number of threads used to flush tables
 DEFAULT_MAX_PARALLELISM = 16  # Don't use more than this number of threads by default when flushing streams in parallel
+DEFAULT_PURGE_OBJECTS = True
 
 
 class RecordValidationException(Exception):
@@ -290,6 +291,7 @@ def flush_streams(
     """
     parallelism = config.get("parallelism", DEFAULT_PARALLELISM)
     max_parallelism = config.get("max_parallelism", DEFAULT_MAX_PARALLELISM)
+    purge_objects = config.get("purge_objects", DEFAULT_PURGE_OBJECTS) in [True, 1, "True", "true"]
 
     # Parallelism 0 means auto parallelism:
     #
@@ -319,7 +321,8 @@ def flush_streams(
             delete_rows=config.get('hard_delete'),
             compression=config.get('compression'),
             slices=config.get('slices'),
-            temp_dir=config.get('temp_dir')
+            temp_dir=config.get('temp_dir'),
+            purge_objects=purge_objects,
         ) for stream in streams_to_flush)
 
     # reset flushed stream records to empty to avoid flushing same records
@@ -344,11 +347,11 @@ def flush_streams(
     return flushed_state
 
 
-def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False, compression=None, slices=None, temp_dir=None):
+def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False, compression=None, slices=None, temp_dir=None, purge_objects=True):
     # Load into redshift
     try:
         if row_count[stream] > 0:
-            flush_records(stream, records_to_load, row_count[stream], db_sync, compression, slices, temp_dir)
+            flush_records(stream, records_to_load, row_count[stream], db_sync, compression, slices, temp_dir, purge_objects)
 
             # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
             if delete_rows:
@@ -371,7 +374,7 @@ def ceiling_division(n, d):
     return -(n // -d)
 
 
-def flush_records(stream, records_to_load, row_count, db_sync, compression=None, slices=None, temp_dir=None):
+def flush_records(stream, records_to_load, row_count, db_sync, compression=None, slices=None, temp_dir=None, purge_objects=True):
     slices = slices or 1
     use_gzip = compression == "gzip"
     use_bzip2 = compression == "bzip2"
@@ -428,8 +431,9 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
     for handle, csv_file in zip(file_handles, csv_files):
         os.close(handle)
         os.remove(csv_file)
-    for s3_key in s3_keys:
-        db_sync.delete_from_s3(s3_key)
+    if purge_objects:
+        for s3_key in s3_keys:
+            db_sync.delete_from_s3(s3_key)
 
 
 def main():
