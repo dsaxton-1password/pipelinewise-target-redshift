@@ -417,7 +417,7 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
             csv_file,
             stream,
             len(chunk),
-            suffix=f"_{file_extension}.{str(chunk_number)}",
+            suffix=f"{file_extension}.{str(chunk_number)}",
         )
         size_bytes += os.path.getsize(csv_file)
         s3_keys = s3_keys + [s3_key]
