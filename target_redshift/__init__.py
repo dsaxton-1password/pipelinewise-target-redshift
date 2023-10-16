@@ -400,8 +400,6 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
     s3_keys = []
     size_bytes = 0
 
-    date_suffix = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-
     # chunk files by the 'slices' config parameter in order to optimise Redshift COPY loading
     # see https://docs.aws.amazon.com/redshift/latest/dg/c_best-practices-use-multiple-files.html
     chunks = chunk_iterable(
@@ -419,7 +417,7 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
             csv_file,
             stream,
             len(chunk),
-            suffix="_" + date_suffix + file_extension + "." + str(chunk_number),
+            suffix=f"_{file_extension}.{str(chunk_number)}",
         )
         size_bytes += os.path.getsize(csv_file)
         s3_keys = s3_keys + [s3_key]
