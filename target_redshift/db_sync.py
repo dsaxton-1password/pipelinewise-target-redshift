@@ -396,7 +396,20 @@ class DbSync:
         s3_acl = self.connection_config.get('s3_acl')
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         timestamp = datetime.utcnow().isoformat()
-        s3_key = f"{s3_key_prefix.strip('/')}/{stream}/exported_date={timestamp[:10]}/{timestamp}-{stream}{suffix}"
+        params = {
+            "stream": stream,
+            "date": timestamp[:10],
+        }
+
+        try:
+            s3_key_prefix = s3_key_prefix.format(**params)
+        except KeyError:
+            raise RuntimeError(
+                f"Invalid s3_key_prefix: {s3_key_prefix}. "
+                f"Must contain template variables {list(params.keys())}."
+            )
+
+        s3_key = f"{s3_key_prefix.strip('/')}/{timestamp}-{stream}{suffix}"
 
         self.logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
