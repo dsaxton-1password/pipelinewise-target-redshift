@@ -395,7 +395,7 @@ class DbSync:
         bucket = self.connection_config['s3_bucket']
         s3_acl = self.connection_config.get('s3_acl')
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.utcnow()
         params = {
             "stream": stream,
             "timestamp": timestamp,
@@ -409,7 +409,7 @@ class DbSync:
                 f"Expected template variables {list(params.keys())}."
             )
 
-        s3_key = f"{s3_key_prefix.strip('/')}/{timestamp}-{stream}{suffix}"
+        s3_key = f"{s3_key_prefix.strip('/')}/{timestamp.isoformat()}-{stream}{suffix}"
 
         self.logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
