@@ -398,7 +398,7 @@ class DbSync:
         timestamp = datetime.utcnow().isoformat()
         params = {
             "stream": stream,
-            "date": timestamp[:10],
+            "timestamp": timestamp,
         }
 
         try:
