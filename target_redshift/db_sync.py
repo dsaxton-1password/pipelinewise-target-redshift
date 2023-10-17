@@ -406,7 +406,7 @@ class DbSync:
         except KeyError:
             raise RuntimeError(
                 f"Invalid s3_key_prefix: {s3_key_prefix}. "
-                f"Must contain template variables {list(params.keys())}."
+                f"Expected template variables {list(params.keys())}."
             )
 
         s3_key = f"{s3_key_prefix.strip('/')}/{timestamp}-{stream}{suffix}"
