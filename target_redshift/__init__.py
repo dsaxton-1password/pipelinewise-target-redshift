@@ -114,8 +114,8 @@ def load_table_cache(config):
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def persist_lines(config, lines, table_cache=None) -> None:
-    state = None
-    flushed_state = None
+    state = {}
+    flushed_state = {}
     schemas = {}
     key_properties = {}
     validators = {}
