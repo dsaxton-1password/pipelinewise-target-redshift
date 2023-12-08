@@ -335,7 +335,7 @@ class DbSync:
         if role_arn:
             self.logger.info(f'Assuming role {role_arn}')
             sts = aws_session.client('sts')
-            response = sts.assume_role(RoleArn=role_arn, DurationSeconds=900, RoleSessionName=f'redshift-{int(time.time())}')
+            response = sts.assume_role(RoleArn=role_arn, RoleSessionName=f'redshift-{int(time.time())}')
             aws_session = boto3.Session(
                 aws_access_key_id=response['Credentials']['AccessKeyId'],
                 aws_secret_access_key=response['Credentials']['SecretAccessKey'],
@@ -434,19 +434,11 @@ class DbSync:
         self.logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
         extra_args = {'ACL': s3_acl} if s3_acl else None
-        self.upload_file_with_retry(file, bucket, s3_key, extra_args)
+        # Refresh session to prevent expiration
+        self.configure_aws()
+        self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
         return s3_key
-
-    def upload_file_with_retry(self, file, bucket, s3_key, extra_args):
-        try:
-            self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
-        except boto3.exceptions.S3UploadFailedError as err:
-            self.logger.warning(
-                f"Error attempting upload to S3: {err}. Regenerating credentials and then retrying."
-            )
-            self.configure_aws()
-            self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
     def delete_from_s3(self, s3_key):
         self.logger.info("Deleting {} from S3".format(s3_key))
