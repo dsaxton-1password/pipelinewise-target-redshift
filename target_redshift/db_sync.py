@@ -335,7 +335,7 @@ class DbSync:
         if role_arn:
             self.logger.info(f'Assuming role {role_arn}')
             sts = aws_session.client('sts')
-            response = sts.assume_role(RoleArn=role_arn, RoleSessionName=f'redshift-{int(time.time())}')
+            response = sts.assume_role(RoleArn=role_arn, DurationSeconds=600, RoleSessionName=f'redshift-{int(time.time())}')
             aws_session = boto3.Session(
                 aws_access_key_id=response['Credentials']['AccessKeyId'],
                 aws_secret_access_key=response['Credentials']['SecretAccessKey'],
