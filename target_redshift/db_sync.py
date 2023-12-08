@@ -298,12 +298,11 @@ class DbSync:
             self.flatten_schema = flatten_schema(stream_schema_message['schema'], max_level=self.data_flattening_max_level)
 
     def configure_aws(self):
-        aws_config = self.get_current_aws_config()
-        aws_access_key_id = aws_config["aws_access_key_id"]
-        aws_secret_access_key = aws_config["aws_secret_access_key"]
-        aws_profile = aws_config["aws_profile"]
-        aws_session_token = aws_config["aws_session_token"]
-        role_arn = aws_config["role_arn"]
+        aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
+        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+        role_arn = self.connection_config.get('role_arn')
 
         aws_session = self.initiate_aws_session(
             aws_access_key_id,
@@ -313,23 +312,8 @@ class DbSync:
             role_arn,
         )
 
-        self.set_s3_client(self, aws_session)
+        self.s3 = aws_session.client('s3')
         self.set_connection_config(self, aws_session)
-
-    def get_current_aws_config(self):
-        aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
-        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
-        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
-        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
-        role_arn = self.connection_config.get('role_arn')
-
-        return {
-            "aws_profile": aws_profile,
-            "aws_access_key_id": aws_access_key_id,
-            "aws_secret_access_key": aws_secret_access_key,
-            "aws_session_token": aws_session_token,
-            "role_arn": role_arn,
-        }
 
     def initiate_aws_session(
         self,
@@ -359,9 +343,6 @@ class DbSync:
             )
 
         return aws_session
-
-    def set_s3_client(self, aws_session):
-        self.s3 = aws_session.client('s3')
 
     def set_connection_config(self, aws_session):
         credentials = aws_session.get_credentials().get_frozen_credentials()
