@@ -313,7 +313,7 @@ class DbSync:
         )
 
         self.s3 = aws_session.client('s3')
-        self.set_connection_config(self, aws_session)
+        self.set_connection_config(aws_session)
 
     def initiate_aws_session(
         self,
