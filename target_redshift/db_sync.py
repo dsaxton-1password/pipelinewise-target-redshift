@@ -434,7 +434,7 @@ class DbSync:
         self.logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
         extra_args = {'ACL': s3_acl} if s3_acl else None
-        self.upload_file_with_retry(file, bucket, s3_key, ExtraArgs=extra_args)
+        self.upload_file_with_retry(file, bucket, s3_key, extra_args)
 
         return s3_key
 
