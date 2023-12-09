@@ -231,7 +231,7 @@ class DbSync:
             self.logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
             sys.exit(1)
 
-        self.configure_aws()
+        self.refresh_aws_credentials()
 
         self.skip_updates = self.connection_config.get('skip_updates', False)
 
@@ -297,7 +297,7 @@ class DbSync:
             self.data_flattening_max_level = self.connection_config.get('data_flattening_max_level', 0)
             self.flatten_schema = flatten_schema(stream_schema_message['schema'], max_level=self.data_flattening_max_level)
 
-    def configure_aws(self):
+    def refresh_aws_credentials(self):
         aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
         aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
         aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
@@ -435,7 +435,7 @@ class DbSync:
 
         extra_args = {'ACL': s3_acl} if s3_acl else None
         # Refresh session to prevent expiration
-        self.configure_aws()
+        self.refresh_aws_credentials()
         self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
         return s3_key
