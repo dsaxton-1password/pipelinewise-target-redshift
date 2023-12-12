@@ -231,41 +231,8 @@ class DbSync:
             self.logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
             sys.exit(1)
 
-        aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
-        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
-        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
-        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
-        role_arn = self.connection_config.get('role_arn')
+        self.refresh_aws_credentials()
 
-        # Init S3 client
-        # Conditionally pass keys as this seems to affect whether instance credentials are correctly loaded if the keys are None
-        if aws_access_key_id and aws_secret_access_key:
-            aws_session = boto3.session.Session(
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
-                aws_session_token=aws_session_token
-            )
-        else:
-            aws_session = boto3.session.Session(profile_name=aws_profile)
-
-        if role_arn:
-            self.logger.info(f'Assuming role {role_arn}')
-            sts = aws_session.client('sts')
-            response = sts.assume_role(RoleArn=role_arn, RoleSessionName='target-redshift-session')
-            aws_session = boto3.Session(
-                aws_access_key_id=response['Credentials']['AccessKeyId'],
-                aws_secret_access_key=response['Credentials']['SecretAccessKey'],
-                aws_session_token=response['Credentials']['SessionToken'],
-            )
-
-        credentials = aws_session.get_credentials().get_frozen_credentials()
-
-        # Explicitly set credentials to those fetched from Boto so we can re-use them in COPY SQL if necessary
-        self.connection_config['aws_access_key_id'] = credentials.access_key
-        self.connection_config['aws_secret_access_key'] = credentials.secret_key
-        self.connection_config['aws_session_token'] = credentials.token
-
-        self.s3 = aws_session.client('s3')
         self.skip_updates = self.connection_config.get('skip_updates', False)
 
         self.schema_name = None
@@ -329,6 +296,59 @@ class DbSync:
 
             self.data_flattening_max_level = self.connection_config.get('data_flattening_max_level', 0)
             self.flatten_schema = flatten_schema(stream_schema_message['schema'], max_level=self.data_flattening_max_level)
+
+    def refresh_aws_credentials(self):
+        aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
+        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+        role_arn = self.connection_config.get('role_arn')
+
+        aws_session = self.initiate_aws_session(
+            aws_access_key_id,
+            aws_secret_access_key,
+            aws_profile,
+            aws_session_token,
+            role_arn,
+        )
+
+        self.s3 = aws_session.client('s3')
+        self.set_connection_config(aws_session)
+
+    def initiate_aws_session(
+        self,
+        aws_access_key_id,
+        aws_secret_access_key,
+        aws_profile,
+        aws_session_token,
+        role_arn,
+    ):
+        if aws_access_key_id and aws_secret_access_key:
+            aws_session = boto3.session.Session(
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                aws_session_token=aws_session_token
+            )
+        else:
+            aws_session = boto3.session.Session(profile_name=aws_profile)
+
+        if role_arn:
+            self.logger.info(f'Assuming role {role_arn}')
+            sts = aws_session.client('sts')
+            response = sts.assume_role(RoleArn=role_arn, RoleSessionName=f'redshift-{int(time.time())}')
+            aws_session = boto3.Session(
+                aws_access_key_id=response['Credentials']['AccessKeyId'],
+                aws_secret_access_key=response['Credentials']['SecretAccessKey'],
+                aws_session_token=response['Credentials']['SessionToken'],
+            )
+
+        return aws_session
+
+    def set_connection_config(self, aws_session):
+        credentials = aws_session.get_credentials().get_frozen_credentials()
+        self.connection_config['aws_access_key_id'] = credentials.access_key
+        self.connection_config['aws_secret_access_key'] = credentials.secret_key
+        self.connection_config['aws_session_token'] = credentials.token
 
     def open_connection(self):
         conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
@@ -414,6 +434,8 @@ class DbSync:
         self.logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
         extra_args = {'ACL': s3_acl} if s3_acl else None
+        # Refresh session to prevent expiration
+        self.refresh_aws_credentials()
         self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
         return s3_key
